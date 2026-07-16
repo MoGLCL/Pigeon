@@ -5,9 +5,21 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const out = join(root, "Out");
 const variants = {
-  "Pigeon-Windows-Local": { docker: false, overlay: "windows" },
-  "Pigeon-Linux-Docker": { docker: true, overlay: "docker" },
-  "Pigeon-Private-Hosting": { docker: true, overlay: "private" },
+  "Pigeon-Windows-Local": {
+    docker: false,
+    overlay: "windows",
+    excludeDocs: ["DOCKER-LINUX.md", "PRIVATE-HOSTING.md", "README.md", "index.html"]
+  },
+  "Pigeon-Linux-Docker": {
+    docker: true,
+    overlay: "docker",
+    excludeDocs: ["WINDOWS.md", "PRIVATE-HOSTING.md", "README.md", "index.html"]
+  },
+  "Pigeon-Private-Hosting": {
+    docker: true,
+    overlay: "private",
+    excludeDocs: ["WINDOWS.md", "DOCKER-LINUX.md", "README.md", "index.html"]
+  },
 };
 const common = [
   "app", "components", "config", "docs", "features", "generated", "lib", "packaging", "prisma", "public", "scripts", "server", "tests",
@@ -24,6 +36,13 @@ for (const [name, options] of Object.entries(variants)) {
   for (const item of [...common, ...(options.docker ? dockerFiles : [])])
     await cp(join(root, item), join(destination, item), { recursive: true });
   await cp(join(root, "packaging", options.overlay), destination, { recursive: true });
+
+  // Clean up other platform documentations
+  if (options.excludeDocs) {
+    for (const file of options.excludeDocs) {
+      await rm(join(destination, "docs", file), { recursive: true, force: true });
+    }
+  }
 }
 await cp(join(root, "docs"), join(out, "Docs"), { recursive: true });
 await writeFile(join(out, "README.md"), await readFile(join(root, "packaging", "OUT-README.md"), "utf8"), "utf8");
