@@ -1,0 +1,3 @@
+import"dotenv/config";import{RUNTIME_CONFIG,saveRuntimeConfig,type RuntimeConfigKey}from"../lib/runtime-config";import{prisma}from"../lib/prisma";
+async function main(){let migrated=0;for(const key of Object.keys(RUNTIME_CONFIG)as RuntimeConfigKey[]){const value=process.env[RUNTIME_CONFIG[key].env];if(!value)continue;const dbKey=`runtime_${key.toLowerCase()}`;const exists=await prisma.setting.findUnique({where:{key:dbKey},select:{id:true}});if(!exists){await saveRuntimeConfig(key,value);migrated++}}console.log(`Runtime configuration migration complete (${migrated} added).`)}
+main().finally(()=>prisma.$disconnect());

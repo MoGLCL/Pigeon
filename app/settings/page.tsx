@@ -1,0 +1,2 @@
+import{Suspense}from"react";import{AppFrame}from"@/components/layout/AppFrame";import{SettingsHub}from"@/components/settings/SettingsHub";
+export default function Page(){return <AppFrame><header className="workspace-header"><div><h1>Settings</h1><p>Manage your profile and account security.</p></div></header><Suspense fallback={<div className="settings-loading">Loading settings…</div>}><SettingsHub/></Suspense></AppFrame>}

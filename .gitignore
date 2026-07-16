@@ -1,0 +1,20 @@
+node_modules/
+.next/
+.next-dev/
+.env
+data/uploads/
+data/whatsapp-media/
+data/openwa-manager.lock
+*.log
+tsconfig.tsbuildinfo
+
+# managed
+**.data.json
+**.node-persist**
+**_IGNORE_**
+# end managed
+
+Out/
+/Out/
+Out
+/Out

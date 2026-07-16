@@ -1,0 +1,3 @@
+"use client";import{useEffect,useRef}from"react";
+export const LIVE_REFRESH_INTERVAL=8000;
+export function useAutoRefresh(load:()=>void|Promise<void>,enabled=true){const callback=useRef(load);callback.current=load;useEffect(()=>{if(!enabled)return;const run=()=>void callback.current();const timer=window.setInterval(run,LIVE_REFRESH_INTERVAL);const visible=()=>{if(document.visibilityState==="visible")run()};document.addEventListener("visibilitychange",visible);window.addEventListener("focus",run);return()=>{clearInterval(timer);document.removeEventListener("visibilitychange",visible);window.removeEventListener("focus",run)}},[enabled])}

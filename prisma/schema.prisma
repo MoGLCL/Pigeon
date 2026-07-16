@@ -1,0 +1,512 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// â”€â”€â”€ ENUMS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+enum Role {
+  owner
+  admin
+  moderator
+  user
+}
+
+enum AccountStatus {
+  active
+  suspended
+  banned
+}
+
+// â”€â”€â”€ USERS & AUTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model User {
+  id                 String        @id @default(uuid())
+  email              String        @unique
+  username           String        @unique
+  passwordHash       String
+  name               String?
+  avatarUrl          String?
+  role               Role          @default(user)
+  status             AccountStatus @default(active)
+  lastLoginAt        DateTime?
+  forcePasswordReset Boolean       @default(false)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  auditLogsActed      AuditLog[]           @relation("ActorLogs")
+  auditLogsTarget     AuditLog[]           @relation("TargetLogs")
+  changelogsSeen      UserChangelogSeen[]
+  announcementsSeen   UserAnnouncementSeen[]
+  reports             Report[]
+  reportReplies       ReportReply[]
+  sessions            UserSession[]
+  facebookPages       FacebookPage[]
+  whatsappAccounts    WhatsAppAccount[]
+  contacts            Contact[]
+  automationRules     AutomationRule[]
+  broadcasts          Broadcast[]
+  notifications       Notification[]
+  settings            UserSetting[]
+  passwordResetTokens PasswordResetToken[]
+  siteVisits          SiteVisit[]
+}
+
+model UserSession {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// â”€â”€â”€ AUDIT LOG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  actor      User     @relation("ActorLogs", fields: [actorId], references: [id])
+  targetId   String?
+  target     User?    @relation("TargetLogs", fields: [targetId], references: [id])
+  action     String // e.g. "role.change", "account.suspend", "settings.update", "broadcast.send"
+  detailsEnc String // encrypted JSON with before/after values
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
+
+// â”€â”€â”€ ANNOUNCEMENTS & CHANGELOG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model Announcement {
+  id        String    @id @default(uuid())
+  title     String
+  body      String
+  type      String    @default("info") // info | warning | success
+  isActive  Boolean   @default(true)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  seenBy    UserAnnouncementSeen[]
+}
+
+model UserAnnouncementSeen {
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  seenAt         DateTime     @default(now())
+  @@id([userId, announcementId])
+}
+
+model Changelog {
+  id          String   @id @default(uuid())
+  version     String
+  title       String
+  body        String // markdown
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  seenBy UserChangelogSeen[]
+}
+
+model UserChangelogSeen {
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  changelogId String
+  changelog   Changelog @relation(fields: [changelogId], references: [id], onDelete: Cascade)
+  seenAt      DateTime  @default(now())
+
+  @@id([userId, changelogId])
+}
+
+// â”€â”€â”€ REPORTS / COMPLAINTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model Report {
+  id           String   @id @default(uuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  contactName  String
+  contactEmail String
+  severity     String   @default("normal") // low | normal | high | risk
+  subject      String
+  body         String
+  status       String   @default("open") // open | in_review | resolved | closed
+  guestTokenHash String? @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  replies ReportReply[]
+}
+
+model ReportReply {
+  id        String   @id @default(uuid())
+  reportId  String
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  guestName String?
+  guestEmail String?
+  body      String
+  createdAt DateTime @default(now())
+}
+
+// â”€â”€â”€ FACEBOOK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model FacebookPage {
+  id                 String    @id @default(uuid())
+  ownerId            String
+  owner              User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  pageId             String
+  name               String
+  accessTokenEnc     String // AES-256-GCM encrypted
+  webhookVerified    Boolean   @default(false)
+  followersCount     Int?
+  avatarUrl          String?
+  tokenExpiresAt     DateTime?
+  grantedPermissions String[]  @default([])
+  status             String    @default("connected")
+  lastSyncedAt       DateTime?
+  connectedAt        DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  posts         FacebookPost[]
+  conversations FacebookConversation[]
+  comments      FacebookComment[]
+  activityItems FacebookActivity[]
+  autoRules     AutomationRule[]
+
+  @@unique([ownerId, pageId])
+  @@index([ownerId])
+}
+
+model FacebookPost {
+  id            String       @id @default(uuid())
+  pageId        String
+  page          FacebookPage @relation(fields: [pageId], references: [id])
+  externalId    String?
+  content       String
+  mediaUrls     String[]
+  status        String // draft | scheduled | published | failed
+  scheduledAt   DateTime?
+  publishedAt   DateTime?
+  reactions     Int          @default(0)
+  commentsCount Int          @default(0)
+  shares        Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model FacebookConversation {
+  id              String       @id @default(uuid())
+  pageId          String
+  page            FacebookPage @relation(fields: [pageId], references: [id])
+  externalId      String
+  participantName String?
+  participantId   String?
+  participantAvatarUrl String?
+  unreadCount     Int          @default(0)
+  lastMessageAt   DateTime?
+  hiddenAt        DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  messages FacebookMessage[]
+
+  @@unique([pageId, externalId])
+}
+
+model FacebookMessage {
+  id             String               @id @default(uuid())
+  conversationId String
+  conversation   FacebookConversation @relation(fields: [conversationId], references: [id])
+  externalId     String?
+  fromPage       Boolean              @default(false)
+  contentEnc     String // AES-256-GCM encrypted
+  attachments    Json?
+  archived       Boolean              @default(false)
+  sentAt         DateTime
+  createdAt      DateTime             @default(now())
+}
+
+model FacebookComment {
+  id         String       @id @default(uuid())
+  pageId     String
+  page       FacebookPage @relation(fields: [pageId], references: [id])
+  externalId String       @unique
+  postId     String?
+  authorName String?
+  authorId   String?
+  authorAvatarUrl String?
+  contentEnc String // AES-256-GCM encrypted
+  status     String       @default("new") // new | replied | hidden | handled
+  reactions  Int          @default(0)
+  archived   Boolean      @default(false)
+  postedAt   DateTime
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model FacebookActivity {
+  id        String       @id @default(uuid())
+  pageId    String
+  page      FacebookPage @relation(fields: [pageId], references: [id])
+  type      String // comment | reaction | message | post | automation
+  summary   String
+  metadata  Json?
+  createdAt DateTime     @default(now())
+}
+
+// â”€â”€â”€ WHATSAPP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model WhatsAppAccount {
+  id                String    @id @default(uuid())
+  ownerId           String
+  owner             User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sessionName       String
+  providerSessionId String?   @unique
+  phoneNumber       String?
+  displayName       String?
+  avatarUrl         String?
+  status            String    @default("disconnected")
+  workerId          String?
+  lastConnectedAt   DateTime?
+  lastError         String?
+  openwaBaseUrl     String?
+  openwaAuthEnc     String?
+  webhookUrl        String?
+  lastHeartbeat     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  conversations WhatsAppConversation[]
+  autoRules     AutomationRule[]
+
+  @@index([ownerId])
+}
+
+model WhatsAppConversation {
+  id            String          @id @default(uuid())
+  accountId     String
+  account       WhatsAppAccount @relation(fields: [accountId], references: [id])
+  contactPhone  String
+  contactJid    String?
+  contactName   String?
+  contactAvatarUrl String?
+  unreadCount   Int             @default(0)
+  lastMessageAt DateTime?
+  hiddenAt      DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  messages WhatsAppMessage[]
+
+  @@unique([accountId, contactPhone])
+}
+
+model WhatsAppMessage {
+  id             String               @id @default(uuid())
+  conversationId String
+  conversation   WhatsAppConversation @relation(fields: [conversationId], references: [id])
+  externalId     String?
+  fromMe         Boolean              @default(false)
+  contentEnc     String? // AES-256-GCM encrypted
+  type           String               @default("text")
+  mediaUrl       String?
+  status         String               @default("sent")
+  archived       Boolean              @default(false)
+  sentAt         DateTime
+  createdAt      DateTime             @default(now())
+
+  @@unique([conversationId, externalId])
+}
+
+// â”€â”€â”€ MESSAGE ARCHIVE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model MessageArchive {
+  id          String   @id @default(uuid())
+  source      String // facebook | whatsapp
+  archiveDate DateTime // the calendar day this archive covers
+  payloadEnc  String // encrypted + compressed JSON
+  sizeBytes   Int
+  createdAt   DateTime @default(now())
+
+  @@unique([source, archiveDate])
+}
+
+// â”€â”€â”€ CONTACTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model Contact {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String?
+  phone          String
+  email          String?
+  avatarUrl      String?
+  fbProfileId    String?
+  notes          String?
+  source         String? // whatsapp | facebook | manual | import
+  firstContactAt DateTime  @default(now())
+  lastMessageAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tags                ContactTag[]
+  broadcastRecipients BroadcastRecipient[]
+
+  @@unique([userId, phone])
+  @@index([userId])
+}
+
+model ContactTag {
+  id        String  @id @default(uuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       String
+}
+
+// â”€â”€â”€ AUTOMATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model AutomationRule {
+  id              String           @id @default(uuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  channel         String // facebook | whatsapp
+  fbPageId        String?
+  fbPage          FacebookPage?    @relation(fields: [fbPageId], references: [id])
+  waAccountId     String?
+  waAccount       WhatsAppAccount? @relation(fields: [waAccountId], references: [id])
+  trigger         String // new_message | keyword | new_comment | comment_keyword | outside_hours | first_message | tagged_contact
+  keywords        String[]
+  replyMessage    String
+  actions         Json?
+  isActive        Boolean          @default(true)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([userId, channel])
+}
+
+// â”€â”€â”€ BROADCAST â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model Broadcast {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel     String // facebook | whatsapp
+  name        String
+  message     String
+  attachments Json?
+  status      String    @default("draft")
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  totalCount  Int       @default(0)
+  sentCount   Int       @default(0)
+  failedCount Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  recipients BroadcastRecipient[]
+
+  @@index([userId, status])
+}
+
+model BroadcastRecipient {
+  id          String    @id @default(uuid())
+  broadcastId String
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id])
+  contactId   String?
+  contact     Contact?  @relation(fields: [contactId], references: [id])
+  phone       String?
+  status      String    @default("pending")
+  sentAt      DateTime?
+  errorMsg    String?
+}
+
+// â”€â”€â”€ NOTIFICATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String?
+  isRead    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead, createdAt])
+}
+
+// â”€â”€â”€ SETTINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model UserSetting {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, key])
+}
+
+// ─── PASSWORD RESET ────────────────────────────────────────────────────────────
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model SiteVisit {
+  id        String   @id @default(uuid())
+  visitorId String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  path      String
+  userAgent String?
+  visitedAt DateTime @default(now())
+
+  @@index([visitedAt])
+  @@index([visitorId, visitedAt])
+  @@index([userId, visitedAt])
+}
+
+// â”€â”€â”€ WEBHOOK EVENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model WebhookEvent {
+  id          String    @id @default(uuid())
+  source      String
+  externalId  String?
+  payload     Json
+  processed   Boolean   @default(false)
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([source, externalId])
+}

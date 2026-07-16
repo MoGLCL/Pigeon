@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pigeon
+      POSTGRES_USER: pigeon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pigeon_secret}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    ports: ["5432:5432"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U pigeon"], interval: 5s, timeout: 5s, retries: 10 }
+  app:
+    build: .
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://pigeon:${POSTGRES_PASSWORD:-pigeon_secret}@db:5432/pigeon?schema=public
+      OPENWA_AUTO_START: "false"
+    depends_on: { db: { condition: service_healthy } }
+    volumes:
+      - pigeon_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/site/status >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+volumes:
+  postgres_data: {}
+  pigeon_data: {}

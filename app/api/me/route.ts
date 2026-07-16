@@ -1,0 +1,1 @@
+import{requireUser}from"@/lib/api";export async function GET(){const g=await requireUser();if("error"in g)return g.error;const{id,name,username,email,role,status,forcePasswordReset}=g.user;return Response.json({id,name,username,email,role,status,forcePasswordReset});}

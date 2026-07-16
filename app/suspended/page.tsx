@@ -1,0 +1,1 @@
+export default function Page(){return <main className="auth-page"><section className="auth-card"><h1>Account suspended</h1><p>Contact the site administrator if you believe this is a mistake.</p></section></main>}

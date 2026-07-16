@@ -1,0 +1,2 @@
+import{AdminFrame}from"@/components/admin/AdminFrame";import{RuntimeConfigForm}from"@/components/owner/RuntimeConfigForm";import{guardPage}from"@/lib/page-auth";
+export default async function Page(){await guardPage("/owner/config");return <AdminFrame><header className="workspace-header admin-page-heading"><div><span className="eyebrow">Owner only</span><h1>Runtime configuration</h1><p>Manage integrations and operational settings without editing deployment files.</p></div></header><RuntimeConfigForm/></AdminFrame>}

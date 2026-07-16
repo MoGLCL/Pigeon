@@ -1,0 +1,2 @@
+import{redirect}from"next/navigation";import{auth}from"@/auth";import{canAccessRoute}from"./rbac";import type{Role}from"@/generated/prisma/client";
+export async function guardPage(path:string){const session=await auth();const user=session?.user;if(!user?.id)redirect("/login");if(user.status==="suspended")redirect("/suspended");if(user.status==="banned")redirect("/banned");if(user.forcePasswordReset&&path!=="/reset-password")redirect("/reset-password");if(!canAccessRoute(user.role as Role,path))redirect("/unauthorized");return user;}

@@ -1,0 +1,2 @@
+import Link from "next/link"; import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
+export default function Page(){return <main className="recovery-page"><section className="recovery-card"><span className="eyebrow">Account recovery</span><h1>Reset your password</h1><p>Enter the email or username connected to your Pigeon account.</p><ForgotPasswordForm/><Link className="back-link" href="/login">← Back to sign in</Link></section></main>}

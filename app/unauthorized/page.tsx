@@ -1,0 +1,1 @@
+export default function Page(){return <main className="auth-page"><section className="auth-card"><h1>Access denied</h1><p>Your role does not have permission to view this area.</p><a className="primary-button" href="/">Return to dashboard</a></section></main>}
